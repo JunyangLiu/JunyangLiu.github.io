@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  
+  
+  
+  <entry>
+    <title>Pixel 3上Android 11源码下载，编译与烧录</title>
+    <link href="/2021/01/01/aosp-build/"/>
+    <url>/2021/01/01/aosp-build/</url>
+    
+    <content type="html"><![CDATA[<p>研究Android系统最好有一套AOSP源码和一台可以编译运行的机器，下面是我Google Pixel 3上编译官方源码的过程记录。</p><h2 id="一，源码下载"><a href="#一，源码下载" class="headerlink" title="一，源码下载"></a>一，源码下载</h2><h3 id="1-1-AOSP源码下载"><a href="#1-1-AOSP源码下载" class="headerlink" title="1.1 AOSP源码下载"></a>1.1 AOSP源码下载</h3><p>从清华镜像站下载速度很快<br>加 <code>--depth 1</code> 控制git深度可以极大节省硬盘空间。最终.repo目录21G左右  </p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><code class="hljs bash">repo init --depth 1 -u https://aosp.tuna.tsinghua.edu.cn/platform/manifest -b android-11.0.0_r1 <br>repo sync -j20<br></code></pre></td></tr></table></figure><h3 id="1-2-pixel-3专有硬件库下载"><a href="#1-2-pixel-3专有硬件库下载" class="headerlink" title="1.2 pixel 3专有硬件库下载"></a>1.2 pixel 3专有硬件库下载</h3><p>Android 11上不加硬件库会导致刷机后无限重启，但之前pixel 1时没有硬件库也能启动，这里踩了一个坑。<br>记得匹配好对应的BUILD_ID和代码, 查看build/core/build_id.mk文件，我的BUILD_ID=RP1A.200720.009，pixel 3的代号是blueline，所以对应的下载地址是：<br><a href="https://developers.google.cn/android/drivers?hl=zh-cn#bluelinerp1a.200720.009">https://developers.google.cn/android/drivers?hl=zh-cn#bluelinerp1a.200720.009</a><br>将两个文件下载到源码根目录，然后执行，会自动生成vendor文件</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><code class="hljs bash">~/code/android11$ tar zxvf google_devices-blueline-rp1a.200720.009-6cd41940.tgz<br>~/code/android11$ tar zxvf qcom-blueline-rp1a.200720.009-f772c38c.tgz<br>~/code/android11$ ./extract-google_devices-blueline.sh<br>~/code/android11$ ./extract-qcom-blueline.sh<br></code></pre></td></tr></table></figure><h2 id="二，编译"><a href="#二，编译" class="headerlink" title="二，编译"></a>二，编译</h2><h3 id="2-1-编译环境"><a href="#2-1-编译环境" class="headerlink" title="2.1 编译环境"></a>2.1 编译环境</h3><p>编译环境搭建参考官方文档：<a href="https://source.android.com/setup/build/initializing">https://source.android.com/setup/build/initializing</a><br>我用的win10应用市场下载的wsl2 ubuntu-18.04的虚拟机，挺好用的，不过比较耗内存，建议将内存加到32G</p><h3 id="2-2-编译"><a href="#2-2-编译" class="headerlink" title="2.2 编译"></a>2.2 编译</h3><p>i5-9600k的机器耗时3个小时，有点久。</p><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><code class="hljs bash">~/code/android11$ <span class="hljs-built_in">source</span> build/envsetup.sh<br>~/code/android11$ lunch aosp_blueline-userdebug<br>~/code/android11$ make -j16<br>...<br>[ 99% 90776/91631] //frameworks/base/packages/SystemUI:SystemUI r8 [common]<br>Invalid descriptor (deserialized from Kotlin @Metadata): (LLandroid/animation/Animator;;)L;<br>Invalid descriptor (deserialized from Kotlin @Metadata): (LLandroid/animation/Animator;;)L;<br>[ 99% 91145/91631] //art/build/apex:art-check-debug-apex-gen generate art-check-debug-apex-gen.dummy<br>--bitness=auto, trying to autodetect. This may be incorrect!<br>  Detected multilib<br>[100% 91631/91631] build out/target/product/blueline/obj/PACKAGING/check-all-partition-sizes_intermediates/check_all_partition_sizes_log<br><br><span class="hljs-comment">#### build completed successfully (02:55:07 (hh:mm:ss)) ####</span><br><br></code></pre></td></tr></table></figure><h2 id="三，烧录"><a href="#三，烧录" class="headerlink" title="三，烧录"></a>三，烧录</h2><h3 id="3-1-解锁OEM"><a href="#3-1-解锁OEM" class="headerlink" title="3.1 解锁OEM"></a>3.1 解锁OEM</h3><p>在开发者选项里打开<code>OEM unlocking</code>选项，如果置灰连上外网看看。如果是有锁的机器尝试找第三方解锁。</p><h3 id="3-2-bootloader解锁"><a href="#3-2-bootloader解锁" class="headerlink" title="3.2 bootloader解锁"></a>3.2 bootloader解锁</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><code class="hljs bash">~/code/android11$ adb reboot bootloader<br>~/code/android11$ fashboot devices<br>xxxxxx<br>~/code/android11$ fastboot flashing unlock<br>~/code/android11$ fastboot reboot<br></code></pre></td></tr></table></figure><h3 id="3-3-烧录"><a href="#3-3-烧录" class="headerlink" title="3.3 烧录"></a>3.3 烧录</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><code class="hljs bash">~/code/android11$ <span class="hljs-built_in">export</span> ANDROID_PRODUCT_OUT=./out/target/product/blueline<br>~/code/android11$ fastboot flashall -w<br>...<br>File system <span class="hljs-built_in">type</span> raw not supported.<br>Erasing <span class="hljs-string">&#x27;metadata&#x27;</span>                                 OKAY [  0.007s]<br>Erase successful, but not automatically formatting.<br>File system <span class="hljs-built_in">type</span> raw not supported.<br>Rebooting                                          OKAY [  0.000s]<br>Finished. Total time: 101.511s<br><br></code></pre></td></tr></table></figure><p><img src="/img/blog/pixel3_aosp.png" alt="pixel 3"> </p>]]></content>
+    
+    
+    
+    <tags>
+      
+      <tag>工具使用</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
+    <title>Hello，不秃的世界</title>
+    <link href="/2020/12/25/hello-world/"/>
+    <url>/2020/12/25/hello-world/</url>
+    
+    <content type="html"><![CDATA[<h2 id="缘起"><a href="#缘起" class="headerlink" title="缘起"></a>缘起</h2><p>　　其实我一直有个执念，就是作为一个程序员，一定要有一个博客，要有一个github，所以断断续续，零零散散的写过一些，但都没有高质量的输出，现在回看起来，很是稚嫩，不忍直视。所以就当作没有做过，另外开辟一个空间，再来一次。不知能不能坚持下来。<br>　　我觉得我并不是个标准的程序员，我日常的工作就是看大段大段的代码，研究大量的log，折腾个几天，最终只写了一行代码。做的事情比较杂，但都是围绕Android在转，调过驱动，写过APP，做过MMI，也定制过一些系统功能，甚至还研究过模拟器，做过编译脚本。我感觉广度是有了，但纵深还是很差，很少静下来总结，深入研究某个模块。魔幻的2020就快要过去了，为充满希望的2021立个目标吧：每周更新一篇像样的博客。</p><h2 id="计划"><a href="#计划" class="headerlink" title="计划"></a>计划</h2><p>对于这个博客的计划，我大概是这样设想的：  </p><ul><li><strong>工具使用</strong>：包括编译，不同层面代码的debug啊，和一些优化工具的使用。我一直崇尚先进生产力工具是可以吊打落后的工具，达到事半功倍的效果。  </li><li><strong>源码分析</strong>：我觉得市场上的源码分析书籍大多都是大段大段的贴代码，很多时候看的一头雾水，我觉得如果要我出解读文章的话，我会从一些实际的需求或demo出发，去研究一块代码。希望我能做到吧。还有就是源码分析可以从另外一个维度来做，就是提取系统的一些代码实现。嗯，希望也能做到。  </li><li><strong>问题处理</strong>：最近工作的平台比较不稳定，遇到了很多乱七八糟的问题，什么外网测速很低，横屏异常啥的。每个都是质问人生式的拷问，薅秃了头，犹如福尔摩斯探案。但是峰回路转的话，过程还是很有趣的，可以记录下来。  </li><li><strong>日常学习</strong>：日常学习的一些新技能也在这里做过记录，比如最近比较感兴趣的opengl和android容器化/虚拟化等。</li></ul><p>最后，作为一个非标准的程序员，我当然是不秃的啦。随手取了这个名字，希望不是立FLAG。本想注册个butu.world的域名，想想还是算了，因为，我大概率做不好。  </p><p align="right">2020-12-25 22:59:41 圣诞快乐</p>]]></content>
+    
+    
+    
+  </entry>
+  
+  
+  
+  
+</search>
