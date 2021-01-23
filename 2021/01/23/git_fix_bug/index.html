@@ -17,7 +17,7 @@
   <meta name="description" content="">
   <meta name="author" content="">
   <meta name="keywords" content="">
-  <title>一起来学binder — cpp/java端的死亡讣告与dump的简单示例 - 不秃的Android世界</title>
+  <title>使用fixup与autosquash命令改变错误提交 - 不秃的Android世界</title>
 
   <link  rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css" />
 
@@ -162,7 +162,7 @@
       <div class="full-bg-img">
         <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
           <div class="page-header text-center fade-in-up">
-            <span class="h2" id="subtitle" title="一起来学binder — cpp/java端的死亡讣告与dump的简单示例">
+            <span class="h2" id="subtitle" title="使用fixup与autosquash命令改变错误提交">
               
             </span>
 
@@ -172,8 +172,8 @@
   
     <span class="post-meta">
       <i class="iconfont icon-date-fill" aria-hidden="true"></i>
-      <time datetime="2021-01-21 23:20" pubdate>
-        2021年1月21日 晚上
+      <time datetime="2021-01-23 11:28" pubdate>
+        2021年1月23日 上午
       </time>
     </span>
   
@@ -209,23 +209,18 @@
         <div class="py-5" id="board">
           <article class="post-content mx-auto">
             <!-- SEO header -->
-            <h1 style="display: none">一起来学binder — cpp/java端的死亡讣告与dump的简单示例</h1>
+            <h1 style="display: none">使用fixup与autosquash命令改变错误提交</h1>
             
             <div class="markdown-body">
-              <blockquote>
-<p>操作系统：Windows 10 专业版 19042.685<br>编译机：WSL2 Ubuntu-18.04<br>手机：Google Pixel 1<br>源码版本：AOSP android-7.1.1_r35</p>
-</blockquote>
-<p>死亡回调是当服务端进程(Bn端)死亡时，通过回调通知到客户端进程(Bp端)。重写IBinder.DeathRecipient的binderDied函数获取回调。<br>Dump是binder服务端默认功能，当终端调用<code>dumpsys BINDER_NAME</code>时，输出信息，只需要重写dump接口即可。<br>所以，死亡回调是在客户端操作，dump是在服务端操作。</p>
-<h2 id="java端注册死亡回调"><a href="#java端注册死亡回调" class="headerlink" title="java端注册死亡回调"></a>java端注册死亡回调</h2><p>binderdemo/java/src/demo/Main.java</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><code class="hljs java">testClient.asBinder().linkToDeath(<span class="hljs-keyword">new</span> IBinder.DeathRecipient() &#123;<br>    <span class="hljs-meta">@Override</span><br>    <span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">binderDied</span><span class="hljs-params">()</span> </span>&#123;<br>        Log.d(<span class="hljs-string">&quot;binder&quot;</span>, <span class="hljs-string">&quot;binderDied calling~!&quot;</span>);<br>        System.out.println(<span class="hljs-string">&quot;binderDied calling&quot;</span>);<br>        System.exit(<span class="hljs-number">0</span>);<br>    &#125;<br>&#125;, <span class="hljs-number">0</span>);<br><span class="hljs-keyword">for</span> (;;);<br></code></pre></td></tr></table></figure>
-<p>因为示例客户端跑完就退出了，所以最后需要加个死循环等待回调。</p>
-<h2 id="cpp端的死亡回调"><a href="#cpp端的死亡回调" class="headerlink" title="cpp端的死亡回调"></a>cpp端的死亡回调</h2><p>cpp端的回调像java那样的写法是不能工作的，因为死亡回调需要工作在binder线程池内，具体原因后面分析代码时再讲。  </p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><code class="hljs cpp"><span class="hljs-class"><span class="hljs-keyword">class</span> <span class="hljs-title">TestDeathRecipient</span> :</span> <span class="hljs-keyword">public</span> IBinder::DeathRecipient<br>&#123;<br>    <span class="hljs-keyword">private</span>:<br>        <span class="hljs-function"><span class="hljs-keyword">virtual</span> <span class="hljs-keyword">void</span> <span class="hljs-title">binderDied</span><span class="hljs-params">(<span class="hljs-keyword">const</span> wp&lt;IBinder&gt;&amp; who)</span> </span>&#123;<br>            INFO(<span class="hljs-string">&quot;client: binderDied&quot;</span>);<br>            <span class="hljs-built_in">exit</span>(EXIT_FAILURE);<br>        &#125;;<br>&#125;;<br><br><span class="hljs-function"><span class="hljs-keyword">int</span> <span class="hljs-title">main</span><span class="hljs-params">(<span class="hljs-keyword">int</span> argc, <span class="hljs-keyword">char</span> **argv)</span> </span>&#123;<br>    <span class="hljs-function">sp&lt;ProcessState&gt; <span class="hljs-title">proc</span><span class="hljs-params">(ProcessState::self())</span></span>;<br>    ProcessState::self()-&gt;startThreadPool();<br>    sp&lt;IServiceManager&gt; sm = defaultServiceManager();<br>    sp&lt;IBinder&gt; binder = sm-&gt;getService(String16(BINDER_NAME));<br>    sp&lt;TestDeathRecipient&gt; death = <span class="hljs-keyword">new</span> TestDeathRecipient();<br>    <span class="hljs-keyword">int</span> link = binder-&gt;linkToDeath(death);<br>    IPCThreadState::self()-&gt;joinThreadPool();<br>    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;<br>&#125;<br></code></pre></td></tr></table></figure>
-<h2 id="java端dump"><a href="#java端dump" class="headerlink" title="java端dump"></a>java端dump</h2><p>binderdemo\java\src\demo\TestServer.java</p>
-<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs java"><span class="hljs-meta">@Override</span><br><span class="hljs-function"><span class="hljs-keyword">public</span> <span class="hljs-keyword">void</span> <span class="hljs-title">dump</span><span class="hljs-params">(FileDescriptor fd, PrintWriter writer, String[] args)</span> </span>&#123;<br>    <span class="hljs-keyword">final</span> IndentingPrintWriter pw = <span class="hljs-keyword">new</span> IndentingPrintWriter(writer, <span class="hljs-string">&quot;  &quot;</span>);<br>    pw.println(<span class="hljs-string">&quot;test_server dump:&quot;</span>);<br>    pw.increaseIndent();<br>    pw.println(<span class="hljs-string">&quot;this is Java implementation&quot;</span>);<br>&#125;<br></code></pre></td></tr></table></figure>
-<h2 id="cpp端dump"><a href="#cpp端dump" class="headerlink" title="cpp端dump"></a>cpp端dump</h2><p>binderdemo/cpp/main.cpp#Test::dump</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><code class="hljs cpp"><span class="hljs-function"><span class="hljs-keyword">status_t</span> <span class="hljs-title">dump</span><span class="hljs-params">(<span class="hljs-keyword">int</span> fd, <span class="hljs-keyword">const</span> Vector&lt;String16&gt; &amp;args)</span> <span class="hljs-keyword">override</span> </span>&#123;<br>    String8 result;<br>    result.append(<span class="hljs-string">&quot;test_server dump:\n&quot;</span>);<br>    result.append(<span class="hljs-string">&quot;this is cpp implementation\n&quot;</span>);<br>    write(fd, result.<span class="hljs-built_in">string</span>(), result.size());<br>    <span class="hljs-keyword">return</span> NO_ERROR;<br>&#125;<br></code></pre></td></tr></table></figure>
-<h2 id="测试与源码"><a href="#测试与源码" class="headerlink" title="测试与源码"></a>测试与源码</h2><p>这个两项测试比较简单，kill掉binder服务端，客户端的binderDied就会获得回调。<br><code>dumpsys test_server</code>就会在终端输出dump的打印。<br>这章主要讲用法，后续再详解死亡讣告原理<br>本章节的代码在tag v0.3下：<br><a target="_blank" rel="noopener" href="https://github.com/hqw700/binderdemo/releases/tag/v0.3">https://github.com/hqw700/binderdemo/releases/tag/v0.3</a></p>
+              <h2 id="起因"><a href="#起因" class="headerlink" title="起因"></a>起因</h2><p>事情是这样的，为了方便读者能找到文章对应的代码，我每个章节提交后都会打一个tag，然后在文章给上这个tag的地址。有次我在提交前将log换成了断言，结果断言写反了，没有验证就提交发布了。后面经过了一些提交才发现这个问题。如果此时我切到这个tag修复并提交，就会导致和文章的链接对应不了， 所以有什么解决办法呢。<br><img src="/img/blog/wrong_commit.png" srcset="/img/loading.gif"> </p>
+<p>目前的提交情况：我需要修改tag v0.3中的一个小错误</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs console"><span class="hljs-meta">$</span><span class="bash"> git <span class="hljs-built_in">log</span> --oneline</span><br>aa278c1 (HEAD -&gt; main, origin/main, origin/HEAD) java binder callback<br>9731e60 (tag: v0.3) cpp binder die<br>19bda12 cpp/java dumpsys server<br>77dbf97 cpp/java binder linkToDeath test<br>0ed8e1c update README and makefile<br>8cbed3f (tag: v0.2) cpp binder code optimization<br>de89247 Merge branch &#x27;main&#x27; of https://github.com/hqw700/binderdemo into main<br>8ae91b8 Gen cpp binder file and test<br>86ee113 cpp binder gen<br>acd95a8 Create README.md<br>7e44f1c (tag: v0.1) Gen java binder file and test<br>b4f22b9 Init aidl file<br></code></pre></td></tr></table></figure>
+<h2 id="使用fixup与autosquash命令改变错误提交"><a href="#使用fixup与autosquash命令改变错误提交" class="headerlink" title="使用fixup与autosquash命令改变错误提交"></a>使用fixup与autosquash命令改变错误提交</h2><p>修改这个错误后, 需要 git commit –fixup=<code>对应commit_id</code><br>然后 git rebase -i –autosquash <code>对应commit_id的上一个id</code><br>这样就会自动将fixup的commit合并到对应的<br><strong>注意：</strong><br>认真观察会发现，这之后的所有id都变了，tag也不见了，但commit的信息没变，所以这是一条很危险的命令，会改变历史。squash命令本来就是优化commit信息的。</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><code class="hljs console"><span class="hljs-meta">$</span><span class="bash"> git add cpp/main.cpp</span><br><span class="hljs-meta">$</span><span class="bash"> git commit --fixup=9731e60</span><br><span class="hljs-meta">$</span><span class="bash"> git <span class="hljs-built_in">log</span> --oneline</span><br>ab4ca46 (HEAD -&gt; main) fixup! cpp binder die<br>aa278c1 (origin/main, origin/HEAD) java binder callback<br>9731e60 (tag: v0.3) cpp binder die<br>19bda12 cpp/java dumpsys server<br>77dbf97 cpp/java binder linkToDeath test<br>0ed8e1c update README and makefile<br>8cbed3f (tag: v0.2) cpp binder code optimization<br>de89247 Merge branch &#x27;main&#x27; of https://github.com/hqw700/binderdemo into main<br>8ae91b8 Gen cpp binder file and test<br>86ee113 cpp binder gen<br>acd95a8 Create README.md<br>7e44f1c (tag: v0.1) Gen java binder file and test<br>b4f22b9 Init aidl file<br><br><span class="hljs-meta">$</span><span class="bash"> git rebase -i --autosquash 9731e60^</span><br><span class="hljs-meta">$</span><span class="bash"> git <span class="hljs-built_in">log</span> --oneline</span><br>efe605c (HEAD -&gt; main) java binder callback<br>cd0d752 cpp binder die<br>19bda12 cpp/java dumpsys server<br>77dbf97 cpp/java binder linkToDeath test<br>0ed8e1c update README and makefile<br>8cbed3f (tag: v0.2) cpp binder code optimization<br>de89247 Merge branch &#x27;main&#x27; of https://github.com/hqw700/binderdemo into main<br>8ae91b8 Gen cpp binder file and test<br>86ee113 cpp binder gen<br>acd95a8 Create README.md<br>7e44f1c (tag: v0.1) Gen java binder file and test<br>b4f22b9 Init aidl file<br></code></pre></td></tr></table></figure>
+<h2 id="push到远程"><a href="#push到远程" class="headerlink" title="push到远程"></a>push到远程</h2><p>因为commit id都变了，push到远程也会提示先pull。pull之后会发现有冲突。</p>
+<figure class="highlight console"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><code class="hljs console"><span class="hljs-meta">$</span><span class="bash"> git push origin main</span><br>To https://github.com/hqw700/binderdemo<br> ! [rejected]        main -&gt; main (non-fast-forward)<br>error: failed to push some refs to &#x27;https://github.com/hqw700/binderdemo&#x27;<br>hint: Updates were rejected because the tip of your current branch is behind<br>hint: its remote counterpart. Integrate the remote changes (e.g.<br>hint: &#x27;git pull ...&#x27;) before pushing again.<br>hint: See the &#x27;Note about fast-forwards&#x27; in &#x27;git push --help&#x27; for details.<br><br><span class="hljs-meta">$</span><span class="bash"> git pull</span><br>Auto-merging cpp/main.cpp<br>CONFLICT (content): Merge conflict in cpp/main.cpp<br>Automatic merge failed; fix conflicts and then commit the result.<br></code></pre></td></tr></table></figure>
+<p>所以需要加上-f选项才可以push成功。<code>git push -f origin main</code></p>
+<h2 id="参考文章"><a href="#参考文章" class="headerlink" title="参考文章"></a>参考文章</h2><p><a target="_blank" rel="noopener" href="http://lazybios.com/2017/01/git-tip-keep-your-branch-clean-with-fixup-and-autosquash/">如何借助fixup与autosquash让Git分支保持整洁</a></p>
 
             </div>
             <hr>
@@ -235,7 +230,7 @@
                   <div class="post-meta mr-3">
                     <i class="iconfont icon-category"></i>
                     
-                      <a class="hover-with-bg" href="/categories/%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90/">源码分析</a>
+                      <a class="hover-with-bg" href="/categories/%E5%B7%A5%E5%85%B7%E4%BD%BF%E7%94%A8/">工具使用</a>
                     
                   </div>
                 
@@ -243,13 +238,11 @@
                   <div class="post-meta">
                     <i class="iconfont icon-tags"></i>
                     
-                      <a class="hover-with-bg" href="/tags/Android%E7%B3%BB%E7%BB%9F/">Android系统</a>
-                    
                       <a class="hover-with-bg" href="/tags/%E6%95%99%E7%A8%8B/">教程</a>
                     
                       <a class="hover-with-bg" href="/tags/github/">github</a>
                     
-                      <a class="hover-with-bg" href="/tags/binder/">binder</a>
+                      <a class="hover-with-bg" href="/tags/%E5%A5%87%E6%8A%80%E6%B7%AB%E5%B7%A7/">奇技淫巧</a>
                     
                   </div>
                 
@@ -262,18 +255,12 @@
                   <article class="post-prev col-6">
                     
                     
-                      <a href="/2021/01/23/git_fix_bug/">
-                        <i class="iconfont icon-arrowleft"></i>
-                        <span class="hidden-mobile">使用fixup与autosquash命令改变错误提交</span>
-                        <span class="visible-mobile">上一篇</span>
-                      </a>
-                    
                   </article>
                   <article class="post-next col-6">
                     
                     
-                      <a href="/2021/01/05/java-binder-gen/">
-                        <span class="hidden-mobile">一起来学binder — java端代码生成</span>
+                      <a href="/2021/01/21/binder_die/">
+                        <span class="hidden-mobile">一起来学binder — cpp/java端的死亡讣告与dump的简单示例</span>
                         <span class="visible-mobile">下一篇</span>
                         <i class="iconfont icon-arrowright"></i>
                       </a>
